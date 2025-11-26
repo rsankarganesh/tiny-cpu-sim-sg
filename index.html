@@ -153,7 +153,7 @@
         .markdown-content strong { color: #38bdf8; }
 
         /* --- UTILS --- */
-        .hidden-custom { display: none; }
+        .hidden-custom { display: none !important; } /* Force hide */
         
         .explanation-box {
             background: #1e293b;
@@ -182,10 +182,19 @@
     <!-- Header -->
     <header class="text-center mb-6">
         <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">Tiny CPU Simulator</h1>
-        <div class="flex justify-center gap-4 text-sm">
-            <label class="flex items-center space-x-2 cursor-pointer">
+        <div class="flex flex-col md:flex-row justify-center gap-4 text-sm items-center">
+            <!-- Toggle 1: Static Explanations -->
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
                 <input type="checkbox" id="toggleExplain" class="form-checkbox h-4 w-4 text-cyan-600 rounded bg-slate-800 border-slate-600">
                 <span class="text-slate-400">Show Static Explanations</span>
+            </label>
+            
+            <span class="hidden md:inline text-slate-700">|</span>
+
+            <!-- Toggle 2: AI Assistant -->
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+                <input type="checkbox" id="toggleAI" class="form-checkbox h-4 w-4 text-purple-600 rounded bg-slate-800 border-slate-600">
+                <span class="text-slate-400 hover:text-purple-300 transition-colors">Enable AI Assistant</span>
             </label>
         </div>
     </header>
@@ -226,7 +235,8 @@
                     <button onclick="startSimulation()" class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-2 px-4 rounded shadow-lg transition-transform transform active:scale-95">
                         Run Cycle
                     </button>
-                    <button onclick="aiGenerateChallenge()" class="w-full bg-slate-700 hover:bg-slate-600 text-purple-300 text-xs py-1 px-2 rounded border border-purple-500/30 flex items-center justify-center gap-1 transition-all">
+                    <!-- Gemini Button (Initially Hidden via JS logic, but default class here) -->
+                    <button id="btnChallenge" onclick="aiGenerateChallenge()" class="hidden-custom w-full bg-slate-700 hover:bg-slate-600 text-purple-300 text-xs py-1 px-2 rounded border border-purple-500/30 flex items-center justify-center gap-1 transition-all">
                         <span>✨</span> Generate Random Challenge
                     </button>
                 </div>
@@ -424,7 +434,8 @@
                 </div>
 
                 <!-- AI TUTOR PANEL -->
-                <div id="aiPanel" class="bg-gradient-to-br from-purple-900/30 to-slate-900 p-4 rounded-lg border border-purple-500/30 mt-4 relative overflow-hidden hidden-custom">
+                <!-- Default Hidden via hidden-custom class -->
+                <div id="aiPanel" class="hidden-custom bg-gradient-to-br from-purple-900/30 to-slate-900 p-4 rounded-lg border border-purple-500/30 mt-4 relative overflow-hidden transition-all duration-300">
                     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-purple-300 font-bold text-sm flex items-center gap-2">
@@ -462,6 +473,7 @@
         let stepIndex = -1;         // Current position in queue
         let isPlaying = false;      // For auto-step
         let timer = null;
+        let aiEnabled = false;      // Global AI switch
 
         // --- GEMINI API CONFIG ---
         const apiKey = ""; 
@@ -485,8 +497,10 @@
             controlsNormal: document.getElementById('normalControls'),
             controlsStep: document.getElementById('stepControls'),
             btnPlayPause: document.getElementById('playPauseBtn'),
+            btnChallenge: document.getElementById('btnChallenge'),
             // Toggles
             checkExplain: document.getElementById('toggleExplain'),
+            checkAI: document.getElementById('toggleAI'),
             // AI
             aiPanel: document.getElementById('aiPanel'),
             aiContent: document.getElementById('aiContent'),
@@ -495,9 +509,32 @@
 
         // --- INITIALIZATION ---
         
+        // Static Explanation Toggle
         ui.checkExplain.addEventListener('change', (e) => {
             document.body.classList.toggle('explanation-mode-on', e.target.checked);
         });
+
+        // AI Feature Toggle
+        ui.checkAI.addEventListener('change', (e) => {
+            aiEnabled = e.target.checked;
+            updateAIState();
+        });
+
+        function updateAIState() {
+            if (aiEnabled) {
+                // Enable UI
+                ui.btnChallenge.classList.remove('hidden-custom');
+                // We don't force-show the panel, but allow it to be shown by interaction
+                // If it already has content, show it, otherwise keep hidden until invoked
+                if (ui.aiContent.innerHTML.length > 100) { // arbitrary length check for meaningful content
+                     ui.aiPanel.classList.remove('hidden-custom');
+                }
+            } else {
+                // Disable UI
+                ui.btnChallenge.classList.add('hidden-custom');
+                ui.aiPanel.classList.add('hidden-custom'); // Force hide panel
+            }
+        }
 
         function setMode(mode) {
             currentMode = mode;
@@ -715,9 +752,12 @@
                     
                     if(op === 'SUB') ui.auxPanel.classList.remove('hidden-custom');
                     else ui.auxPanel.classList.add('hidden-custom');
-
-                    ui.aiPanel.classList.remove('hidden-custom');
-                    ui.aiContent.innerHTML = 'Click "Explain this Calculation" to have the AI analyze these exact bits and operations.';
+                    
+                    // Show AI Panel if enabled and ready
+                    if(aiEnabled) {
+                        ui.aiPanel.classList.remove('hidden-custom');
+                        ui.aiContent.innerHTML = 'Click "Explain this Calculation" to have the AI analyze these exact bits and operations.';
+                    }
                 }
             });
 
@@ -927,6 +967,8 @@
         // --- GEMINI AI FUNCTIONS ---
 
         async function aiExplainLogic() {
+            if (!aiEnabled) return; // Guard clause
+
             const valA = parseInt(ui.inputA.value);
             const valB = parseInt(ui.inputB.value);
             const op = ui.op.value;
@@ -962,7 +1004,9 @@
         }
 
         async function aiGenerateChallenge() {
-            const btn = document.querySelector('button[onclick="aiGenerateChallenge()"]');
+            if (!aiEnabled) return; // Guard clause
+
+            const btn = document.querySelector('#btnChallenge');
             const originalText = btn.innerHTML;
             btn.innerHTML = `<span>⏳</span> Generating...`;
             btn.disabled = true;
@@ -991,8 +1035,11 @@
                 log(`✨ AI Challenge: ${challenge.reason}`);
                 startSimulation();
                 
-                ui.aiPanel.classList.remove('hidden-custom');
-                ui.aiContent.innerHTML = `<strong>Challenge Loaded:</strong> ${challenge.reason}<br><br>Click 'Explain' to see the detailed logic.`;
+                // Show AI explanation immediately for this challenge if enabled
+                if(aiEnabled) {
+                    ui.aiPanel.classList.remove('hidden-custom');
+                    ui.aiContent.innerHTML = `<strong>Challenge Loaded:</strong> ${challenge.reason}<br><br>Click 'Explain' to see the detailed logic.`;
+                }
 
             } catch (error) {
                 log("Error generating challenge.");
@@ -1004,6 +1051,7 @@
         }
 
         async function callGemini(prompt) {
+            if (!aiEnabled) return; // Extra safety guard
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const response = await fetch(url, {
                 method: 'POST',
