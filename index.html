@@ -47,9 +47,12 @@
             color: #64748b;
         }
 
+        /* Active highlight for bits being processed */
         .bit.active {
-            border-color: #f43f5e; /* Red highlight for current bit being processed */
+            border-color: #f43f5e; /* Red highlight */
             transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+            z-index: 10;
         }
 
         /* Logic Gate SVG Styling */
@@ -85,6 +88,11 @@
         }
         .processing {
             animation: pulse 1s infinite;
+        }
+        
+        /* Utility for hidden elements */
+        .hidden-custom {
+            display: none;
         }
     </style>
 </head>
@@ -154,6 +162,25 @@
                     </div>
                 </div>
 
+                <!-- Auxiliary Display (For 2's Comp Steps) - Initially Hidden -->
+                <div id="auxContainer" class="hidden-custom bg-slate-800/80 p-4 rounded-lg border border-indigo-500/50">
+                    <h4 class="text-indigo-400 font-mono text-sm mb-3 border-b border-indigo-500/30 pb-1">INTERNAL OPERATIONS (2's COMP)</h4>
+                    
+                    <div class="mb-3">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-slate-400 font-mono">1's Complement (~B)</span>
+                        </div>
+                        <div id="bitsOnesComp" class="flex justify-center font-mono text-xs scale-90"></div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs text-slate-400 font-mono">2's Complement (+1)</span>
+                        </div>
+                        <div id="bitsTwosComp" class="flex justify-center font-mono text-xs scale-90"></div>
+                    </div>
+                </div>
+
                 <!-- Status / Steps Log -->
                 <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 h-48 overflow-y-auto">
                     <h3 class="text-cyan-400 font-mono mb-2 border-b border-slate-700 pb-1">CPU LOG</h3>
@@ -184,7 +211,7 @@
 
                         <!-- XOR 1 (Top Left) -->
                         <g id="gate_xor1" transform="translate(80, 20)">
-                            <path d="M0,0 Q10,25 0,50 L10,50 L15,50 Q40,25 15,0 L10,0 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/> <!-- Custom shape simplified -->
+                            <path d="M0,0 Q10,25 0,50 L10,50 L15,50 Q40,25 15,0 L10,0 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/>
                             <text x="10" y="30" font-size="10" fill="white">XOR</text>
                         </g>
 
@@ -224,7 +251,7 @@
 
                         <!-- OR Gate (Right Bottom) - Produces Carry Out -->
                         <g id="gate_or" transform="translate(270, 150)">
-                             <path d="M0,0 Q10,25 0,50 Q40,25 0,0" fill="none" stroke="transparent"/> <!-- spacer -->
+                             <path d="M0,0 Q10,25 0,50 Q40,25 0,0" fill="none" stroke="transparent"/>
                              <path d="M0,0 Q15,25 0,50 L10,50 Q45,25 10,0 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/>
                             <text x="10" y="30" font-size="10" fill="white">OR</text>
                         </g>
@@ -262,12 +289,12 @@
 
     <script>
         // --- CONSTANTS & STATE ---
-        const DELAY_MS = 800; // Speed of animation
+        const DELAY_MS = 600; // Animation speed
         let isRunning = false;
 
-        // --- UTILITIES ---
+        // --- BINARY UTILITIES ---
 
-        // Convert number to array of bits (Least Significant Bit at index 0)
+        // Decimal -> 8-bit Binary Array (LSB at index 0)
         function toBinArray(num, bits = 8) {
             let bin = [];
             for (let i = 0; i < bits; i++) {
@@ -276,7 +303,7 @@
             return bin; // [bit0, bit1, bit2...]
         }
 
-        // Convert bit array back to number
+        // Binary Array -> Decimal
         function fromBinArray(arr) {
             let num = 0;
             for (let i = 0; i < arr.length; i++) {
@@ -285,9 +312,22 @@
             return num;
         }
 
-        // Handle 2's complement for display logic if we wanted negative support
-        // But for this simplified demo, we treat outputs as standard integers 
-        // unless subtraction goes negative.
+        // Bitwise NOT (Invert)
+        function bitwiseNot(arr) {
+            return arr.map(bit => bit === 1 ? 0 : 1);
+        }
+
+        // Simple Binary Add (No visual delay) - Used for pre-calculating 2's Comp
+        function simpleAddOne(arr) {
+            let result = [...arr];
+            let carry = 1;
+            for (let i = 0; i < result.length; i++) {
+                let sum = result[i] + carry;
+                result[i] = sum % 2;
+                carry = Math.floor(sum / 2);
+            }
+            return result;
+        }
 
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
@@ -317,13 +357,12 @@
         }
 
         function resetGateVisuals() {
-            // Remove active classes from all SVG elements
             document.querySelectorAll('.gate-active').forEach(el => el.classList.remove('gate-active'));
             document.querySelectorAll('.wire-active').forEach(el => el.classList.remove('wire-active'));
             document.getElementById('activeBitIndex').innerText = '-';
         }
 
-        // Visualize the Full Adder Logic
+        // Visualize Logic Gates based on A, B, Cin inputs
         function updateGateVisuals(a, b, cin) {
             resetGateVisuals();
 
@@ -332,104 +371,106 @@
             if (b) document.getElementById('wire_b').classList.add('wire-active');
             if (cin) document.getElementById('wire_cin').classList.add('wire-active');
 
-            // Gate Logic Calculations
+            // Gate Logic
             const xor1 = a ^ b;
             const and1 = a & b;
             const and2 = xor1 & cin;
             const sum = xor1 ^ cin;
             const cout = and1 | and2;
 
-            // Light up wires and gates based on flow
-            
-            // XOR 1 Path
+            // Visual Paths
             if (a || b) document.getElementById('gate_xor1').classList.add('gate-active');
             if (xor1) {
                 document.getElementById('wire_xor1_out').classList.add('wire-active');
                 document.getElementById('wire_xor1_to_and2').classList.add('wire-active');
             }
-
-            // AND 1 Path
             if (a && b) {
                 document.getElementById('gate_and1').classList.add('gate-active');
                 document.getElementById('wire_and1_out').classList.add('wire-active');
             }
-
-            // AND 2 Path
             if (xor1 && cin) {
                 document.getElementById('wire_cin_to_and2').classList.add('wire-active');
                 document.getElementById('gate_and2').classList.add('gate-active');
                 document.getElementById('wire_and2_out').classList.add('wire-active');
             }
-
-            // XOR 2 (Sum) Path
             if (xor1 || cin) document.getElementById('gate_xor2').classList.add('gate-active');
             if (sum) document.getElementById('wire_sum').classList.add('wire-active');
-
-            // OR (Cout) Path
             if (and1 || and2) {
                 document.getElementById('gate_or').classList.add('gate-active');
                 document.getElementById('wire_cout').classList.add('wire-active');
             }
         }
 
-        // --- SIMULATION LOGIC ---
+        // --- MAIN SIMULATION LOOP ---
 
         async function runSimulation() {
             if (isRunning) return;
             isRunning = true;
             document.getElementById('computeBtn').disabled = true;
-            document.getElementById('consoleLog').innerHTML = ''; // Clear log
+            document.getElementById('consoleLog').innerHTML = ''; 
             resetGateVisuals();
 
-            // Get Inputs
+            // 1. Get Decimal Inputs
             let valA = parseInt(document.getElementById('inputA').value) || 0;
             let valB = parseInt(document.getElementById('inputB').value) || 0;
             const op = document.getElementById('operation').value;
 
-            // Clamp inputs
+            // Clamp
             valA = Math.min(99, Math.max(0, valA));
             valB = Math.min(99, Math.max(0, valB));
 
-            // Update Input Displays
+            // 2. Convert to Binary (Raw Values)
             let bitsA = toBinArray(valA, 8);
             let bitsB = toBinArray(valB, 8);
             
+            // 3. Render Registers (Always show Raw Values)
             renderRegister('bitsA', bitsA);
             renderRegister('bitsB', bitsB);
             document.getElementById('displayValA').innerText = `Dec: ${valA}`;
             document.getElementById('displayValB').innerText = `Dec: ${valB}`;
 
+            // Reset UI states
+            document.getElementById('auxContainer').classList.add('hidden-custom');
+
             log(`Starting ${op} Operation...`);
             log(`Fetching A: ${bitsA.slice().reverse().join('')}`);
             log(`Fetching B: ${bitsB.slice().reverse().join('')}`);
-
             await sleep(500);
 
             let resultBits = [];
             let resultVal = 0;
 
             if (op === 'ADD') {
-                resultBits = await simulateRippleCarryAdder(bitsA, bitsB);
+                // Pass raw B bits and highlight Register B
+                resultBits = await simulateRippleCarryAdder(bitsA, bitsB, 0, 'bitsA', 'bitsB');
                 resultVal = fromBinArray(resultBits);
+                
             } else if (op === 'SUB') {
-                // 2's Complement Logic: Invert B and Add 1
-                log("Calculating 2's Complement of B...");
+                // 2's Complement Logic
+                // Show auxiliary panel
+                document.getElementById('auxContainer').classList.remove('hidden-custom');
                 
-                // Step 1: Invert
-                let invertedB = bitsB.map(b => b ? 0 : 1);
-                renderRegister('bitsB', invertedB); // Show inversion
-                log("B Inverted (1's Comp)");
-                await sleep(1000);
+                log("--- Subtraction Setup ---");
+                
+                // Step 1: 1's Complement
+                let onesComp = bitwiseNot(bitsB);
+                renderRegister('bitsOnesComp', onesComp);
+                log(`1's Complement (~B): ${onesComp.slice().reverse().join('')}`);
+                await sleep(800);
 
-                // Step 2: Add 1 (We use the adder logic for this internally or cheat slightly for setup)
-                // For visual clarity, we will pass Inverted B + CarryIn=1 to the adder
-                log("Setting Carry-In = 1 for Subtraction");
-                resultBits = await simulateRippleCarryAdder(bitsA, invertedB, 1);
+                // Step 2: 2's Complement (+1)
+                let twosComp = simpleAddOne(onesComp);
+                renderRegister('bitsTwosComp', twosComp);
+                log(`2's Complement (+1): ${twosComp.slice().reverse().join('')}`);
+                await sleep(800);
+
+                log("--- Processing Adder ---");
+                // Pass 2's Comp bits to adder, highlight 2's Comp display
+                resultBits = await simulateRippleCarryAdder(bitsA, twosComp, 0, 'bitsA', 'bitsTwosComp');
                 
-                // Interpret Result for subtraction
-                // If the result is technically negative in 8-bit, it shows large number.
-                // Simple Display Logic:
-                resultVal = valA - valB; // Use JS math for the Decimal display to avoid confusing the user with signed binary complexity
+                // For subtraction, simple subtraction logic for decimal display
+                resultVal = valA - valB; 
+                
             } else if (op === 'MUL') {
                 resultBits = await simulateMultiplication(bitsA, bitsB);
                 resultVal = fromBinArray(resultBits);
@@ -445,74 +486,62 @@
             document.getElementById('computeBtn').disabled = false;
         }
 
-        async function simulateRippleCarryAdder(bitsA, bitsB, initialCarry = 0) {
+        // --- ADDER SIMULATION ---
+        
+        // Revised signature: accepts explicit bit arrays and DOM IDs for highlighting
+        async function simulateRippleCarryAdder(arrA, arrB, initialCarry, domIdA, domIdB) {
             let carry = initialCarry;
             let sumBits = new Array(8).fill(0);
 
             for (let i = 0; i < 8; i++) {
+                // 1. Highlight UI
                 document.getElementById('activeBitIndex').innerText = i;
-                renderRegister('bitsA', bitsA, i);
-                
-                // Subtraction modifies B visually before this, but if we are just adding:
-                // We keep B highlighted
-                const currentB = document.getElementById('bitsB').children[7-i].classList.contains('one') ? 1 : 0; 
-                // We grab directly from DOM for B to respect the Inversion visual in Subtraction
-                
-                // Highlight current bit in B register (visual only)
-                const domBitsB = document.getElementById('bitsB').children;
-                Array.from(domBitsB).forEach(el => el.classList.remove('active'));
-                domBitsB[7-i].classList.add('active');
+                renderRegister(domIdA, arrA, i);
+                renderRegister(domIdB, arrB, i); // Highlights either Register B or 2's Comp Display
 
-                const a = bitsA[i];
-                const b = currentB;
+                // 2. Get Bit Values
+                const a = arrA[i];
+                const b = arrB[i];
 
-                // Logic Gate Calculation
+                // 3. Logic Gate Calculation
                 const sum = (a ^ b) ^ carry;
                 const nextCarry = (a & b) | ((a ^ b) & carry);
 
-                // Visualize
+                // 4. Visualize
                 updateGateVisuals(a, b, carry);
                 log(`Bit ${i}: ${a} + ${b} + Cin(${carry}) = Sum ${sum}, Cout ${nextCarry}`);
 
                 sumBits[i] = sum;
-                
-                // Update Result register progressively
-                renderRegister('bitsResult', sumBits, i);
+                renderRegister('bitsResult', sumBits, i); // Show partial result
 
                 await sleep(DELAY_MS);
                 carry = nextCarry;
             }
+            
+            // Clear highlights
+            renderRegister(domIdA, arrA, -1);
+            renderRegister(domIdB, arrB, -1);
+            
             return sumBits;
         }
 
         async function simulateMultiplication(bitsA, bitsB) {
-            // Simplified visualization of Shift-and-Add
-            // Because full binary multiplication takes many steps, we will show
-            // the accumulation of partial products.
-            
-            let accumulator = new Array(16).fill(0); // Need more space for mul
-            let tempA = [...bitsA, 0,0,0,0,0,0,0,0]; // Extend to 16 bits
+            let accumulator = new Array(16).fill(0); 
 
             renderRegister('bitsResult', accumulator);
 
             for (let i = 0; i < 8; i++) {
-                // Highlight Bit B[i]
                 renderRegister('bitsB', bitsB, i);
                 
                 if (bitsB[i] === 1) {
-                    log(`Bit B[${i}] is 1: Adding shifted A to Accumulator`);
-                    
-                    // Show the shift visually by updating the "Gate" area to show an ADD op
-                    // We won't run the full adder animation 8 times (too slow), 
-                    // instead we flash the addition result.
+                    log(`Bit B[${i}] is 1: Adding shifted A`);
                     
                     let shiftedA = new Array(16).fill(0);
-                    // Manually shift A by i positions
                     for(let k=0; k<8; k++) {
                         if(bitsA[k]) shiftedA[k+i] = 1;
                     }
 
-                    // Perform addition logic in JS for the accumulator
+                    // Add to accumulator
                     let carry = 0;
                     for(let j=0; j<16; j++) {
                         let bitA = shiftedA[j];
@@ -525,10 +554,11 @@
                     renderRegister('bitsResult', accumulator);
                     await sleep(DELAY_MS);
                 } else {
-                    log(`Bit B[${i}] is 0: Skipping`);
                     await sleep(DELAY_MS / 2);
                 }
             }
+            // Clear highlight
+            renderRegister('bitsB', bitsB, -1);
             return accumulator;
         }
 
