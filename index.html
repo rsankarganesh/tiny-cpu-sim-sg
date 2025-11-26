@@ -13,10 +13,21 @@
     
     <style>
         /* --- THEME & BASE --- */
+        :root {
+            --accent-blue: #4cc9f0; /* For Home Button */
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: #0f172a; /* Slate 900 */
             color: #e2e8f0;
+        }
+        
+        /* New Home Button Hover Effect */
+        #home-btn:hover {
+            background: var(--accent-blue) !important;
+            color: white !important;
+            transform: scale(1.05);
         }
         
         .font-mono { font-family: 'Fira Code', monospace; }
@@ -179,8 +190,29 @@
 </head>
 <body class="min-h-screen flex flex-col items-center p-4">
 
+    <!-- NEW HOME BUTTON -->
+    <a href="https://rsankarganesh.github.io/my-dev-tools/" 
+       id="home-btn" 
+       style="
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.35);
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: bold;
+        color: var(--accent-blue);
+        text-decoration: none;
+        border: 1px solid rgba(255,255,255,0.15);
+        backdrop-filter: blur(5px);
+        z-index: 999;
+        transition: 0.2s ease;">
+        ⬅ Home
+    </a>
+
     <!-- Header -->
-    <header class="text-center mb-6">
+    <header class="text-center mb-6 pt-10 md:pt-0">
         <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">Tiny CPU Simulator</h1>
         <div class="flex flex-col md:flex-row justify-center gap-4 text-sm items-center">
             <!-- Toggle 1: Static Explanations -->
