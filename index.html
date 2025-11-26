@@ -4,24 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tiny CPU: Logic Gate Simulator</title>
-    <!-- Tailwind CSS for layout -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Marked for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <style>
-        /* Custom Styling for the Cyberpunk/Tech feel */
+        /* --- THEME & BASE --- */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0f172a; /* Dark Slate */
+            background-color: #0f172a; /* Slate 900 */
             color: #e2e8f0;
         }
         
-        .font-mono {
-            font-family: 'Fira Code', monospace;
-        }
+        .font-mono { font-family: 'Fira Code', monospace; }
 
-        /* Bit Styling */
+        /* --- BITS & REGISTERS --- */
         .bit {
             width: 30px;
             height: 40px;
@@ -33,534 +33,986 @@
             margin: 2px;
             border-radius: 4px;
             font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        .bit.one {
+            background-color: #0ea5e9; /* Sky 500 */
+            color: white;
+            border-color: #38bdf8;
+            box-shadow: 0 0 5px rgba(14, 165, 233, 0.5);
+        }
+        .bit.zero { color: #64748b; }
+
+        /* --- HIGHLIGHTING ANIMATIONS --- */
+        @keyframes highlight-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); border-color: #f43f5e; }
+            70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); border-color: #f43f5e; }
+            100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+        }
+
+        .highlight-active {
+            animation: highlight-pulse 1.5s infinite;
+            border-color: #f43f5e !important; /* Rose 500 */
+        }
+        
+        /* Highlight for panels/sections */
+        .panel-active {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            border-color: #38bdf8 !important; /* Sky 400 */
+            background-color: rgba(30, 41, 59, 0.8);
+        }
+
+        .result-active {
+            box-shadow: 0 0 25px rgba(34, 197, 94, 0.4);
+            border-color: #22c55e !important;
+            transform: scale(1.02);
             transition: all 0.3s ease;
         }
 
-        .bit.one {
-            background-color: #0ea5e9; /* Sky Blue */
-            color: white;
-            border-color: #38bdf8;
-            box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
-        }
-
-        .bit.zero {
-            color: #64748b;
-        }
-
-        /* Active highlight for bits being processed */
-        .bit.active {
-            border-color: #f43f5e; /* Red highlight */
-            transform: scale(1.1);
-            box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
-            z-index: 10;
-        }
-
-        /* Logic Gate SVG Styling */
-        .gate-path {
-            fill: none;
-            stroke: #475569;
-            stroke-width: 2;
-            transition: stroke 0.3s;
-        }
-        .gate-body {
-            fill: #1e293b;
-            stroke: #475569;
-            stroke-width: 2;
-            transition: all 0.3s;
-        }
+        /* --- LOGIC GATES SVG --- */
+        .gate-path { fill: none; stroke: #475569; stroke-width: 2; transition: stroke 0.2s; }
+        .gate-body { fill: #1e293b; stroke: #475569; stroke-width: 2; transition: all 0.2s; }
         
-        /* Active states for gates */
         .gate-active .gate-body {
-            stroke: #22c55e; /* Green */
+            stroke: #22c55e; /* Green 500 */
             fill: #064e3b;
-            box-shadow: 0 0 10px #22c55e;
+            filter: drop-shadow(0 0 5px #22c55e);
         }
         .wire-active {
             stroke: #22c55e !important;
             stroke-width: 3 !important;
+            filter: drop-shadow(0 0 3px #22c55e);
+        }
+        .gate-text {
+            font-size: 10px;
+            fill: #94a3b8;
+            font-family: monospace;
+            pointer-events: none;
+        }
+        .gate-active + .gate-text, .gate-active .gate-text {
+            fill: #ffffff;
+            font-weight: bold;
         }
 
-        /* Animations */
-        @keyframes pulse {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
+        /* --- LOG & INTERACTION --- */
+        .log-line {
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 0.75rem;
         }
-        .processing {
-            animation: pulse 1s infinite;
+        .log-line:hover { background-color: rgba(255,255,255,0.05); }
+        .log-line-active {
+            background-color: rgba(34, 197, 94, 0.15);
+            border-left: 3px solid #22c55e;
         }
+
+        /* --- AI FEATURES --- */
+        .ai-glow { animation: ai-pulse 3s infinite; }
+        @keyframes ai-pulse {
+            0% { box-shadow: 0 0 5px #a855f7; }
+            50% { box-shadow: 0 0 20px #d8b4fe; }
+            100% { box-shadow: 0 0 5px #a855f7; }
+        }
+        .markdown-content p { margin-bottom: 0.5em; }
+        .markdown-content strong { color: #38bdf8; }
+
+        /* --- UTILS --- */
+        .hidden-custom { display: none; }
         
-        /* Utility for hidden elements */
-        .hidden-custom {
-            display: none;
+        /* Collapsible Explanation Text */
+        .explanation-box {
+            background: #1e293b;
+            border-left: 4px solid #f59e0b; /* Amber */
+            padding: 8px 12px;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            display: none; 
         }
+        .explanation-mode-on .explanation-box { display: block; }
+        
+        .loader {
+            border: 3px solid #1e293b;
+            border-top: 3px solid #a855f7;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4">
 
     <!-- Header -->
-    <header class="text-center mb-8">
+    <header class="text-center mb-6">
         <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">Tiny CPU Simulator</h1>
-        <p class="text-slate-400">Visualizing 8-bit Arithmetic & Logic Gates</p>
+        <div class="flex justify-center gap-4 text-sm">
+            <label class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" id="toggleExplain" class="form-checkbox h-4 w-4 text-cyan-600 rounded bg-slate-800 border-slate-600">
+                <span class="text-slate-400">Show Static Explanations</span>
+            </label>
+        </div>
     </header>
 
     <!-- Main Control Panel -->
-    <main class="w-full max-w-4xl bg-slate-800/50 rounded-xl p-6 border border-slate-700 shadow-2xl backdrop-blur-sm">
+    <main class="w-full max-w-6xl bg-slate-800/50 rounded-xl p-6 border border-slate-700 shadow-2xl backdrop-blur-sm">
         
-        <!-- Input Section -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div class="flex flex-col">
-                <label class="text-sm text-cyan-400 mb-1">Input A (0-99)</label>
-                <input type="number" id="inputA" value="12" min="0" max="99" class="bg-slate-900 border border-slate-600 rounded p-2 text-white focus:outline-none focus:border-cyan-500">
-            </div>
-            
-            <div class="flex flex-col">
-                <label class="text-sm text-cyan-400 mb-1">Operation</label>
-                <select id="operation" class="bg-slate-900 border border-slate-600 rounded p-2 text-white focus:outline-none focus:border-cyan-500">
-                    <option value="ADD">ADD (Ripple Carry)</option>
-                    <option value="SUB">SUB (2's Complement)</option>
-                    <option value="MUL">MUL (Shift & Add)</option>
-                </select>
+        <!-- Input & Controls Row -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8 items-end">
+            <!-- Inputs -->
+            <div class="col-span-12 md:col-span-8 grid grid-cols-3 gap-4">
+                <div class="flex flex-col">
+                    <label class="text-xs text-cyan-400 mb-1 uppercase tracking-wider">Input A</label>
+                    <input type="number" id="inputA" value="12" min="0" max="99" class="bg-slate-900 border border-slate-600 rounded p-2 text-white font-mono focus:border-cyan-500 outline-none">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-xs text-cyan-400 mb-1 uppercase tracking-wider">Op</label>
+                    <select id="operation" class="bg-slate-900 border border-slate-600 rounded p-2 text-white font-mono focus:border-cyan-500 outline-none">
+                        <option value="ADD">ADD (+)</option>
+                        <option value="SUB">SUB (-)</option>
+                        <option value="MUL">MUL (×)</option>
+                    </select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-xs text-cyan-400 mb-1 uppercase tracking-wider">Input B</label>
+                    <input type="number" id="inputB" value="5" min="0" max="99" class="bg-slate-900 border border-slate-600 rounded p-2 text-white font-mono focus:border-cyan-500 outline-none">
+                </div>
             </div>
 
-            <div class="flex flex-col">
-                <label class="text-sm text-cyan-400 mb-1">Input B (0-99)</label>
-                <input type="number" id="inputB" value="5" min="0" max="99" class="bg-slate-900 border border-slate-600 rounded p-2 text-white focus:outline-none focus:border-cyan-500">
-            </div>
+            <!-- Execution Controls -->
+            <div class="col-span-12 md:col-span-4 flex flex-col justify-end">
+                <!-- Mode Toggle -->
+                <div class="flex bg-slate-900 rounded-lg p-1 mb-2 border border-slate-700">
+                    <button id="modeNormalBtn" class="flex-1 text-xs py-1 rounded bg-cyan-700 text-white font-bold transition-all" onclick="setMode('NORMAL')">Normal</button>
+                    <button id="modeStepBtn" class="flex-1 text-xs py-1 rounded text-slate-400 hover:text-white transition-all" onclick="setMode('STEP')">Step Mode</button>
+                </div>
 
-            <div class="flex flex-col justify-end">
-                <button onclick="runSimulation()" id="computeBtn" class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-2 px-4 rounded transition-all transform hover:scale-105 shadow-lg">
-                    Run CPU Cycle
-                </button>
+                <!-- Action Buttons -->
+                <div id="normalControls" class="flex flex-col gap-2">
+                    <button onclick="startSimulation()" class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-2 px-4 rounded shadow-lg transition-transform transform active:scale-95">
+                        Run Cycle
+                    </button>
+                    <!-- Gemini Button -->
+                    <button onclick="aiGenerateChallenge()" class="w-full bg-slate-700 hover:bg-slate-600 text-purple-300 text-xs py-1 px-2 rounded border border-purple-500/30 flex items-center justify-center gap-1 transition-all">
+                        <span>✨</span> Generate Random Challenge
+                    </button>
+                </div>
+
+                <div id="stepControls" class="hidden-custom flex gap-2">
+                    <button onclick="simController.prev()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-white border border-slate-600" title="Previous Step">←</button>
+                    <button onclick="simController.playPause()" id="playPauseBtn" class="flex-1 bg-cyan-700 hover:bg-cyan-600 rounded text-white font-bold py-2 border border-cyan-500">Start</button>
+                    <button onclick="simController.next()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded text-white border border-slate-600" title="Next Step">→</button>
+                </div>
             </div>
         </div>
 
         <!-- Dashboard Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            <!-- Left Column: Registers -->
-            <div class="space-y-6">
+            <!-- Left Column: Registers & Logs (4 cols) -->
+            <div class="lg:col-span-4 space-y-6">
+                
                 <!-- Register A -->
-                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                <div id="panelRegA" class="bg-slate-900 p-4 rounded-lg border border-slate-700 transition-all duration-300">
                     <div class="flex justify-between mb-2">
-                        <span class="text-cyan-400 font-mono">REGISTER A</span>
-                        <span id="displayValA" class="text-xs text-slate-500">Dec: 0</span>
+                        <span class="text-cyan-400 font-mono font-bold">REGISTER A</span>
+                        <span id="displayValA" class="text-xs text-slate-400 font-mono bg-slate-800 px-2 py-0.5 rounded">Dec: 0</span>
                     </div>
-                    <div id="bitsA" class="flex justify-center font-mono text-sm">
-                        <!-- Bits injected by JS -->
+                    <div id="bitsA" class="flex justify-center font-mono text-sm gap-1"></div>
+                    <div class="explanation-box">
+                        <strong>Registers:</strong> Small, ultra-fast storage inside the CPU. Register A holds your first number converted into 8 bits (1 byte).
                     </div>
                 </div>
 
                 <!-- Register B -->
-                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                <div id="panelRegB" class="bg-slate-900 p-4 rounded-lg border border-slate-700 transition-all duration-300">
                     <div class="flex justify-between mb-2">
-                        <span class="text-cyan-400 font-mono">REGISTER B</span>
-                        <span id="displayValB" class="text-xs text-slate-500">Dec: 0</span>
+                        <span class="text-cyan-400 font-mono font-bold">REGISTER B</span>
+                        <span id="displayValB" class="text-xs text-slate-400 font-mono bg-slate-800 px-2 py-0.5 rounded">Dec: 0</span>
                     </div>
-                    <div id="bitsB" class="flex justify-center font-mono text-sm">
-                        <!-- Bits injected by JS -->
-                    </div>
+                    <div id="bitsB" class="flex justify-center font-mono text-sm gap-1"></div>
                 </div>
 
-                <!-- Auxiliary Display (For 2's Comp Steps) - Initially Hidden -->
-                <div id="auxContainer" class="hidden-custom bg-slate-800/80 p-4 rounded-lg border border-indigo-500/50">
-                    <h4 class="text-indigo-400 font-mono text-sm mb-3 border-b border-indigo-500/30 pb-1">INTERNAL OPERATIONS (2's COMP)</h4>
+                <!-- Internal Operations (Hidden unless needed) -->
+                <div id="auxContainer" class="hidden-custom bg-slate-800/80 p-4 rounded-lg border border-indigo-500/50 transition-all duration-300">
+                    <h4 class="text-indigo-400 font-mono text-sm mb-3 border-b border-indigo-500/30 pb-1 font-bold">ALU INTERNAL (2's COMPLEMENT)</h4>
                     
-                    <div class="mb-3">
+                    <div id="panelInv" class="mb-4 transition-all duration-200 p-1 rounded">
                         <div class="flex justify-between mb-1">
-                            <span class="text-xs text-slate-400 font-mono">1's Complement (~B)</span>
+                            <span class="text-xs text-slate-400 font-mono">1. Invert Bits (NOT Gate)</span>
                         </div>
-                        <div id="bitsOnesComp" class="flex justify-center font-mono text-xs scale-90"></div>
+                        <div id="bitsOnesComp" class="flex justify-center font-mono text-xs scale-90 gap-1"></div>
                     </div>
 
-                    <div>
+                    <div id="panel2C" class="transition-all duration-200 p-1 rounded">
                         <div class="flex justify-between mb-1">
-                            <span class="text-xs text-slate-400 font-mono">2's Complement (+1)</span>
+                            <span class="text-xs text-slate-400 font-mono">2. Add 1 (Result)</span>
                         </div>
-                        <div id="bitsTwosComp" class="flex justify-center font-mono text-xs scale-90"></div>
+                        <div id="bitsTwosComp" class="flex justify-center font-mono text-xs scale-90 gap-1"></div>
                     </div>
                 </div>
 
-                <!-- Status / Steps Log -->
-                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 h-48 overflow-y-auto">
-                    <h3 class="text-cyan-400 font-mono mb-2 border-b border-slate-700 pb-1">CPU LOG</h3>
-                    <div id="consoleLog" class="font-mono text-xs text-green-400 space-y-1">
-                        <div>> System Ready...</div>
+                <!-- Log -->
+                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 h-64 flex flex-col">
+                    <h3 class="text-cyan-400 font-mono mb-2 border-b border-slate-700 pb-1 text-xs uppercase tracking-wider">Instruction Log</h3>
+                    <div id="consoleLog" class="font-mono text-xs text-green-400 space-y-1 overflow-y-auto flex-1 pr-2">
+                        <div class="text-slate-500 italic">> CPU Halted. Ready for input.</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Column: Visual ALU -->
-            <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 flex flex-col items-center">
-                <h3 class="text-cyan-400 font-mono mb-4">LOGIC GATE VISUALIZER (1 BIT)</h3>
-                
-                <!-- SVG Logic Gate Diagram (Full Adder) -->
-                <!-- A, B, Cin Inputs -> Sum, Cout -->
-                <div class="relative w-full max-w-sm aspect-video bg-slate-800 rounded border border-slate-600 p-2">
-                    <svg viewBox="0 0 400 250" class="w-full h-full">
-                        <!-- Inputs -->
-                        <text x="20" y="40" fill="white" font-size="12">A</text>
-                        <text x="20" y="100" fill="white" font-size="12">B</text>
-                        <text x="20" y="210" fill="white" font-size="12">CarryIn</text>
-
-                        <!-- Wires (Paths) -->
-                        <!-- A to XOR1 and AND1 -->
-                        <path id="wire_a" d="M 40 40 L 80 40 L 80 140" class="gate-path" /> 
-                        <!-- B to XOR1 and AND1 -->
-                        <path id="wire_b" d="M 40 100 L 60 100 L 60 60 L 80 60 L 60 100 L 80 160" class="gate-path" />
-
-                        <!-- XOR 1 (Top Left) -->
-                        <g id="gate_xor1" transform="translate(80, 20)">
-                            <path d="M0,0 Q10,25 0,50 L10,50 L15,50 Q40,25 15,0 L10,0 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/>
-                            <text x="10" y="30" font-size="10" fill="white">XOR</text>
-                        </g>
-
-                        <!-- AND 1 (Bottom Left) -->
-                        <g id="gate_and1" transform="translate(80, 130)">
-                            <path d="M0,0 L15,0 Q35,25 15,50 L0,50 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/>
-                            <text x="5" y="30" font-size="10" fill="white">AND</text>
-                        </g>
-
-                        <!-- Wire from XOR1 output -->
-                        <path id="wire_xor1_out" d="M 120 45 L 200 45" class="gate-path" />
-                        
-                        <!-- Wire from CarryIn -->
-                        <path id="wire_cin" d="M 60 210 L 200 210 L 200 85" class="gate-path" />
-
-                        <!-- XOR 2 (Right Top) - Produces SUM -->
-                        <g id="gate_xor2" transform="translate(200, 30)">
-                            <path d="M0,0 Q10,25 0,50 L10,50 L15,50 Q40,25 15,0 L10,0 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/>
-                            <text x="10" y="30" font-size="10" fill="white">XOR</text>
-                        </g>
-
-                        <!-- AND 2 (Middle) -->
-                        <g id="gate_and2" transform="translate(200, 100)">
-                            <path d="M0,0 L15,0 Q35,25 15,50 L0,50 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/>
-                            <text x="5" y="30" font-size="10" fill="white">AND</text>
-                        </g>
-
-                        <!-- Wire: XOR1_out connects to AND2 input -->
-                        <path id="wire_xor1_to_and2" d="M 160 45 L 160 115 L 200 115" class="gate-path" />
-                        <!-- Wire: Cin connects to AND2 input -->
-                        <path id="wire_cin_to_and2" d="M 180 210 L 180 135 L 200 135" class="gate-path" />
-
-                        <!-- Wire from AND1 out -->
-                        <path id="wire_and1_out" d="M 115 155 L 270 155 L 270 180" class="gate-path" />
-                        <!-- Wire from AND2 out -->
-                        <path id="wire_and2_out" d="M 235 125 L 270 125 L 270 160" class="gate-path" />
-
-                        <!-- OR Gate (Right Bottom) - Produces Carry Out -->
-                        <g id="gate_or" transform="translate(270, 150)">
-                             <path d="M0,0 Q10,25 0,50 Q40,25 0,0" fill="none" stroke="transparent"/>
-                             <path d="M0,0 Q15,25 0,50 L10,50 Q45,25 10,0 Z" fill="#1e293b" stroke="currentColor" class="gate-body"/>
-                            <text x="10" y="30" font-size="10" fill="white">OR</text>
-                        </g>
-
-                        <!-- Outputs -->
-                        <path id="wire_sum" d="M 240 55 L 350 55" class="gate-path" />
-                        <text x="360" y="60" fill="#38bdf8" font-weight="bold">SUM</text>
-
-                        <path id="wire_cout" d="M 315 175 L 350 175" class="gate-path" />
-                        <text x="360" y="180" fill="#f43f5e" font-weight="bold">C-OUT</text>
-
-                    </svg>
+            <!-- Right Column: Visual ALU & Logic (8 cols) -->
+            <div class="lg:col-span-8 flex flex-col space-y-6">
+                <!-- Visualizer -->
+                <div id="panelGates" class="bg-slate-900 p-4 rounded-lg border border-slate-700 flex flex-col items-center relative transition-all duration-300">
+                    <div class="flex w-full justify-between items-center mb-2">
+                        <h3 class="text-cyan-400 font-mono text-sm font-bold">1-BIT FULL ADDER CIRCUIT</h3>
+                        <span class="text-xs text-slate-500 bg-slate-800 px-2 rounded border border-slate-700">Active Bit: <span id="activeBitIndex" class="text-white font-bold font-mono">-</span></span>
+                    </div>
                     
-                    <div class="absolute top-2 right-2 text-xs text-slate-500 bg-slate-900/80 p-1 rounded">
-                        Active Bit Index: <span id="activeBitIndex" class="text-white font-bold">-</span>
+                    <!-- UPDATED Logic Gate Diagram -->
+                    <div class="w-full aspect-video bg-slate-800 rounded border border-slate-600 p-2 overflow-hidden relative">
+                        <svg viewBox="0 0 500 300" class="w-full h-full">
+                            <!-- Background Grid (Optional) -->
+                            <defs>
+                                <pattern id="smallGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+                                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
+                                </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill="url(#smallGrid)" />
+
+                            <!-- INPUT LABELS -->
+                            <text x="20" y="55" class="gate-text">INPUT A</text>
+                            <text x="20" y="105" class="gate-text">INPUT B</text>
+                            <text x="20" y="245" class="gate-text">CARRY IN</text>
+
+                            <!-- WIRES (Base Paths) -->
+                            <!-- Wire A -->
+                            <path id="wire_a" d="M 60 50 L 100 50 L 100 130" class="gate-path" /> 
+                            
+                            <!-- Wire B -->
+                            <path id="wire_b" d="M 60 100 L 80 100 L 80 70 L 100 70 L 80 100 L 80 150 L 100 150" class="gate-path" />
+
+                            <!-- Wire Cin -->
+                            <path id="wire_cin" d="M 60 240 L 260 240 L 260 100" class="gate-path" />
+
+                            <!-- STAGE 1 GATES -->
+                            <!-- XOR 1 (A, B) -->
+                            <g id="gate_xor1" transform="translate(100, 30)">
+                                <path d="M0,0 Q10,20 0,40 L10,40 L15,40 Q45,20 15,0 L10,0 Z" class="gate-body"/>
+                                <text x="12" y="24" class="gate-text">XOR</text>
+                            </g>
+                            
+                            <!-- AND 1 (A, B) -->
+                            <g id="gate_and1" transform="translate(100, 120)">
+                                <path d="M0,0 L20,0 Q40,20 20,40 L0,40 Z" class="gate-body"/>
+                                <text x="5" y="24" class="gate-text">AND</text>
+                            </g>
+
+                            <!-- STAGE 1 OUTPUTS -->
+                            <!-- XOR1 Out -->
+                            <path id="wire_xor1_out" d="M 145 50 L 260 50" class="gate-path" />
+                            <path id="wire_xor1_to_and2" d="M 220 50 L 220 140 L 260 140" class="gate-path" />
+
+                            <!-- AND1 Out -->
+                            <path id="wire_and1_out" d="M 140 140 L 350 140 L 350 170 L 370 170" class="gate-path" />
+
+                            <!-- Connect Cin to AND2 -->
+                            <path id="wire_cin_to_and2" d="M 240 240 L 240 160 L 260 160" class="gate-path" />
+
+
+                            <!-- STAGE 2 GATES -->
+                            <!-- XOR 2 (XOR1_out, Cin) -->
+                            <g id="gate_xor2" transform="translate(260, 30)">
+                                <path d="M0,0 Q10,20 0,40 L10,40 L15,40 Q45,20 15,0 L10,0 Z" class="gate-body"/>
+                                <text x="12" y="24" class="gate-text">XOR</text>
+                            </g>
+
+                            <!-- AND 2 (XOR1_out, Cin) -->
+                            <g id="gate_and2" transform="translate(260, 130)">
+                                <path d="M0,0 L20,0 Q40,20 20,40 L0,40 Z" class="gate-body"/>
+                                <text x="5" y="24" class="gate-text">AND</text>
+                            </g>
+
+                            <!-- STAGE 2 OUTPUTS -->
+                            <!-- Sum (XOR2 Out) -->
+                            <path id="wire_sum" d="M 305 50 L 450 50" class="gate-path" />
+                            
+                            <!-- AND2 Out -->
+                            <path id="wire_and2_out" d="M 300 150 L 350 150 L 350 190 L 370 190" class="gate-path" />
+
+
+                            <!-- STAGE 3 GATE (OR) -->
+                            <!-- OR (AND1_out, AND2_out) -->
+                            <g id="gate_or" transform="translate(370, 160)">
+                                <path d="M0,0 Q10,20 0,40 Q40,20 0,0" fill="none" stroke="transparent"/> <!-- spacer -->
+                                <path d="M0,0 Q15,20 0,40 L10,40 Q50,20 10,0 Z" class="gate-body"/>
+                                <text x="12" y="24" class="gate-text">OR</text>
+                            </g>
+
+                            <!-- Final Cout -->
+                            <path id="wire_cout" d="M 420 180 L 450 180" class="gate-path" />
+
+                            <!-- FINAL OUTPUT LABELS -->
+                            <text x="455" y="55" fill="#38bdf8" font-weight="bold" font-family="monospace">SUM</text>
+                            <text x="455" y="185" fill="#f43f5e" font-weight="bold" font-family="monospace">COUT</text>
+                        </svg>
+                    </div>
+
+                    <div class="mt-4 w-full grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400 bg-slate-800/50 p-3 rounded border border-slate-700/50">
+                        <div class="flex items-start gap-2">
+                            <span class="font-bold text-cyan-400">XOR Gates</span>
+                            <p>Compute the partial Sum. 1+0=1, 1+1=0.</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="font-bold text-green-400">AND Gates</span>
+                            <p>Detect overflows. If both inputs are 1, we need to carry.</p>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <span class="font-bold text-pink-400">OR Gate</span>
+                            <p>Combines carries from A+B or from the previous Carry input.</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="mt-4 w-full">
+                <!-- Final Result -->
+                <div id="panelResult" class="bg-slate-900 p-4 rounded-lg border border-slate-700 transition-all duration-300">
                     <div class="flex justify-between mb-2">
                         <span class="text-green-400 font-mono font-bold">FINAL RESULT</span>
-                        <span id="displayValResult" class="text-xs text-slate-500">Dec: 0</span>
+                        <div id="displayValResult" class="text-xs text-white bg-green-900/50 border border-green-700 px-3 py-1 rounded font-mono font-bold">Dec: 0</div>
                     </div>
-                    <div id="bitsResult" class="flex justify-center flex-wrap font-mono text-sm">
-                        <!-- Result Bits -->
+                    <div id="bitsResult" class="flex justify-center flex-wrap font-mono text-sm gap-1"></div>
+                    <div class="explanation-box">
+                        <strong>Result:</strong> The 8 sum bits form the final binary number.
                     </div>
                 </div>
+
+                <!-- AI TUTOR PANEL -->
+                <div id="aiPanel" class="bg-gradient-to-br from-purple-900/30 to-slate-900 p-4 rounded-lg border border-purple-500/30 mt-4 relative overflow-hidden hidden-custom">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-purple-300 font-bold text-sm flex items-center gap-2">
+                            <span>✨</span> AI Circuit Architect
+                        </h3>
+                        <button onclick="aiExplainLogic()" class="text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded transition-colors">
+                            Explain this Calculation
+                        </button>
+                    </div>
+                    <div id="aiContent" class="text-xs text-slate-300 font-mono leading-relaxed markdown-content min-h-[60px]">
+                        Click "Explain this Calculation" to have the AI analyze these exact bits and operations.
+                    </div>
+                    <div id="aiLoader" class="hidden-custom absolute inset-0 bg-slate-900/90 flex items-center justify-center z-10">
+                        <div class="loader"></div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </main>
 
-    <footer class="mt-8 text-slate-500 text-sm">
-        <p>Ripple Carry • 2's Complement • Shift-Add Logic</p>
+    <footer class="mt-8 text-slate-500 text-sm text-center">
+        <p>Ripple Carry Adder • 2's Complement Subtraction • Shift-Add Multiplication • ✨ Gemini AI</p>
     </footer>
 
+    <!-- LOGIC SCRIPT -->
     <script>
-        // --- CONSTANTS & STATE ---
-        const DELAY_MS = 600; // Animation speed
-        let isRunning = false;
+        // --- CONFIG ---
+        const DELAY_AUTO = 800;  // Delay in Normal Mode
+        const DELAY_FAST = 400;  // Delay in Auto-Step Mode
+        
+        // --- STATE ---
+        let currentMode = 'NORMAL'; // 'NORMAL' or 'STEP'
+        let executionQueue = [];    // Array of Step Objects
+        let stepIndex = -1;         // Current position in queue
+        let isPlaying = false;      // For auto-step
+        let timer = null;
 
-        // --- BINARY UTILITIES ---
+        // --- GEMINI API CONFIG ---
+        const apiKey = ""; 
 
-        // Decimal -> 8-bit Binary Array (LSB at index 0)
-        function toBinArray(num, bits = 8) {
-            let bin = [];
-            for (let i = 0; i < bits; i++) {
-                bin.push((num >> i) & 1);
+        // --- DOM ELEMENTS (Cached) ---
+        const ui = {
+            inputA: document.getElementById('inputA'),
+            inputB: document.getElementById('inputB'),
+            op: document.getElementById('operation'),
+            console: document.getElementById('consoleLog'),
+            auxPanel: document.getElementById('auxContainer'),
+            bitsA: document.getElementById('bitsA'),
+            bitsB: document.getElementById('bitsB'),
+            bitsRes: document.getElementById('bitsResult'),
+            displayA: document.getElementById('displayValA'),
+            displayB: document.getElementById('displayValB'),
+            displayRes: document.getElementById('displayValResult'),
+            // Buttons
+            btnNormal: document.getElementById('modeNormalBtn'),
+            btnStep: document.getElementById('modeStepBtn'),
+            controlsNormal: document.getElementById('normalControls'),
+            controlsStep: document.getElementById('stepControls'),
+            btnPlayPause: document.getElementById('playPauseBtn'),
+            // Toggles
+            checkExplain: document.getElementById('toggleExplain'),
+            // AI
+            aiPanel: document.getElementById('aiPanel'),
+            aiContent: document.getElementById('aiContent'),
+            aiLoader: document.getElementById('aiLoader')
+        };
+
+        // --- INITIALIZATION ---
+        
+        ui.checkExplain.addEventListener('change', (e) => {
+            document.body.classList.toggle('explanation-mode-on', e.target.checked);
+        });
+
+        function setMode(mode) {
+            currentMode = mode;
+            stopAutoPlay();
+            
+            // UI Toggle Styles
+            if (mode === 'NORMAL') {
+                ui.btnNormal.className = "flex-1 text-xs py-1 rounded bg-cyan-700 text-white font-bold transition-all";
+                ui.btnStep.className = "flex-1 text-xs py-1 rounded text-slate-400 hover:text-white transition-all";
+                ui.controlsNormal.classList.remove('hidden-custom');
+                ui.controlsStep.classList.add('hidden-custom');
+            } else {
+                ui.btnNormal.className = "flex-1 text-xs py-1 rounded text-slate-400 hover:text-white transition-all";
+                ui.btnStep.className = "flex-1 text-xs py-1 rounded bg-cyan-700 text-white font-bold transition-all";
+                ui.controlsNormal.classList.add('hidden-custom');
+                ui.controlsStep.classList.remove('hidden-custom');
             }
-            return bin; // [bit0, bit1, bit2...]
+            
+            // Reset simulation when switching modes
+            resetUI();
+            log("Mode changed to " + mode + ". Ready.");
         }
 
-        // Binary Array -> Decimal
+        // --- CORE MATH & LOGIC ---
+
+        function toBinArray(num) {
+            let bin = [];
+            for (let i = 0; i < 8; i++) bin.push((num >> i) & 1);
+            return bin;
+        }
+
         function fromBinArray(arr) {
             let num = 0;
-            for (let i = 0; i < arr.length; i++) {
-                if (arr[i] === 1) num += Math.pow(2, i);
-            }
+            for (let i = 0; i < arr.length; i++) if (arr[i] === 1) num += Math.pow(2, i);
             return num;
         }
 
-        // Bitwise NOT (Invert)
-        function bitwiseNot(arr) {
-            return arr.map(bit => bit === 1 ? 0 : 1);
-        }
+        function invertBits(arr) { return arr.map(b => b ? 0 : 1); }
 
-        // Simple Binary Add (No visual delay) - Used for pre-calculating 2's Comp
-        function simpleAddOne(arr) {
-            let result = [...arr];
-            let carry = 1;
-            for (let i = 0; i < result.length; i++) {
-                let sum = result[i] + carry;
-                result[i] = sum % 2;
-                carry = Math.floor(sum / 2);
+        function addOne(arr) {
+            let res = [...arr];
+            let c = 1;
+            for(let i=0; i<8; i++) {
+                let s = res[i] + c;
+                res[i] = s % 2;
+                c = Math.floor(s/2);
             }
-            return result;
+            return res;
         }
 
-        function sleep(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
+        // --- VISUALIZATION HELPERS ---
 
-        function log(msg) {
-            const el = document.getElementById('consoleLog');
-            const line = document.createElement('div');
-            line.innerText = `> ${msg}`;
-            el.appendChild(line);
-            el.scrollTop = el.scrollHeight;
-        }
-
-        // --- UI RENDERING ---
-
-        function renderRegister(elementId, bitArray, activeIndex = -1) {
-            const container = document.getElementById(elementId);
-            container.innerHTML = '';
-            // Display bits in reverse order (MSB on left, LSB on right) for human reading
-            for (let i = bitArray.length - 1; i >= 0; i--) {
-                const bitVal = bitArray[i];
-                const div = document.createElement('div');
-                div.className = `bit ${bitVal ? 'one' : 'zero'} ${i === activeIndex ? 'active' : ''}`;
-                div.innerText = bitVal;
-                container.appendChild(div);
-            }
-        }
-
-        function resetGateVisuals() {
+        function clearHighlights() {
+            document.querySelectorAll('.highlight-active').forEach(el => el.classList.remove('highlight-active'));
+            document.querySelectorAll('.panel-active').forEach(el => el.classList.remove('panel-active'));
+            document.querySelectorAll('.result-active').forEach(el => el.classList.remove('result-active'));
+            document.querySelectorAll('.log-line-active').forEach(el => el.classList.remove('log-line-active'));
+            
+            // Reset Gates
             document.querySelectorAll('.gate-active').forEach(el => el.classList.remove('gate-active'));
             document.querySelectorAll('.wire-active').forEach(el => el.classList.remove('wire-active'));
             document.getElementById('activeBitIndex').innerText = '-';
         }
 
-        // Visualize Logic Gates based on A, B, Cin inputs
-        function updateGateVisuals(a, b, cin) {
-            resetGateVisuals();
+        function highlightElement(id, cssClass = 'highlight-active') {
+            const el = document.getElementById(id);
+            if(el) el.classList.add(cssClass);
+        }
 
-            // Inputs
-            if (a) document.getElementById('wire_a').classList.add('wire-active');
-            if (b) document.getElementById('wire_b').classList.add('wire-active');
-            if (cin) document.getElementById('wire_cin').classList.add('wire-active');
+        function highlightPanel(id) {
+            const el = document.getElementById(id);
+            if(el) el.classList.add('panel-active');
+        }
 
-            // Gate Logic
-            const xor1 = a ^ b;
-            const and1 = a & b;
-            const and2 = xor1 & cin;
-            const sum = xor1 ^ cin;
-            const cout = and1 | and2;
-
-            // Visual Paths
-            if (a || b) document.getElementById('gate_xor1').classList.add('gate-active');
-            if (xor1) {
-                document.getElementById('wire_xor1_out').classList.add('wire-active');
-                document.getElementById('wire_xor1_to_and2').classList.add('wire-active');
-            }
-            if (a && b) {
-                document.getElementById('gate_and1').classList.add('gate-active');
-                document.getElementById('wire_and1_out').classList.add('wire-active');
-            }
-            if (xor1 && cin) {
-                document.getElementById('wire_cin_to_and2').classList.add('wire-active');
-                document.getElementById('gate_and2').classList.add('gate-active');
-                document.getElementById('wire_and2_out').classList.add('wire-active');
-            }
-            if (xor1 || cin) document.getElementById('gate_xor2').classList.add('gate-active');
-            if (sum) document.getElementById('wire_sum').classList.add('wire-active');
-            if (and1 || and2) {
-                document.getElementById('gate_or').classList.add('gate-active');
-                document.getElementById('wire_cout').classList.add('wire-active');
+        function renderRegister(container, bits, activeIdx = -1) {
+            container.innerHTML = '';
+            for (let i = bits.length - 1; i >= 0; i--) {
+                const b = bits[i];
+                const div = document.createElement('div');
+                div.className = `bit ${b ? 'one' : 'zero'} ${i === activeIdx ? 'active' : ''}`;
+                div.innerText = b;
+                div.id = `${container.id}-bit-${i}`; // ID for targeting
+                container.appendChild(div);
             }
         }
 
-        // --- MAIN SIMULATION LOOP ---
+        function log(msg, tags = [], clickCallback = null) {
+            const div = document.createElement('div');
+            div.className = 'log-line text-slate-300';
+            div.innerHTML = `> ${msg}`;
+            
+            // Interactivity
+            div.onclick = () => {
+                // Remove other highlights
+                document.querySelectorAll('.log-line-active').forEach(el => el.classList.remove('log-line-active'));
+                div.classList.add('log-line-active');
+                
+                // Trigger specific gate highlighting if callback exists
+                if (clickCallback) clickCallback();
 
-        async function runSimulation() {
-            if (isRunning) return;
-            isRunning = true;
-            document.getElementById('computeBtn').disabled = true;
-            document.getElementById('consoleLog').innerHTML = ''; 
-            resetGateVisuals();
+                // Jump Logic based on tags
+                if(tags.includes('REG_A')) highlightPanel('panelRegA');
+                if(tags.includes('REG_B')) highlightPanel('panelRegB');
+                if(tags.includes('INV')) highlightPanel('panelInv');
+                if(tags.includes('2C')) highlightPanel('panel2C');
+                if(tags.includes('GATES')) highlightPanel('panelGates');
+                if(tags.includes('RESULT')) {
+                    const res = document.getElementById('panelResult');
+                    res.classList.add('result-active');
+                    setTimeout(() => res.classList.remove('result-active'), 1000);
+                }
+            };
 
-            // 1. Get Decimal Inputs
-            let valA = parseInt(document.getElementById('inputA').value) || 0;
-            let valB = parseInt(document.getElementById('inputB').value) || 0;
-            const op = document.getElementById('operation').value;
+            ui.console.appendChild(div);
+            ui.console.scrollTop = ui.console.scrollHeight;
+            return div; // Return ref to highlight later if needed
+        }
 
+        function updateGateSVG(a, b, cin) {
+            // Logic
+            const xor1 = a ^ b;
+            const and1 = a & b;
+            const sum = xor1 ^ cin; // xor2
+            const and2 = xor1 & cin;
+            const cout = and1 | and2;
+
+            // Reset
+            document.querySelectorAll('.gate-active').forEach(el => el.classList.remove('gate-active'));
+            document.querySelectorAll('.wire-active').forEach(el => el.classList.remove('wire-active'));
+
+            // Helper to toggle class
+            const toggle = (id, active) => {
+                const el = document.getElementById(id);
+                if(el && active) {
+                    if (id.startsWith('gate')) el.classList.add('gate-active');
+                    else el.classList.add('wire-active');
+                }
+            }
+
+            toggle('wire_a', a);
+            toggle('wire_b', b);
+            toggle('wire_cin', cin);
+
+            // Stage 1
+            if (a || b) toggle('gate_xor1', true);
+            if (xor1) { 
+                toggle('wire_xor1_out', true); 
+                toggle('wire_xor1_to_and2', true); 
+            }
+            if (a && b) { 
+                toggle('gate_and1', true); 
+                toggle('wire_and1_out', true); 
+            }
+
+            // Stage 2
+            if (xor1 || cin) toggle('gate_xor2', true);
+            if (sum) toggle('wire_sum', true);
+
+            if (xor1 && cin) { 
+                toggle('gate_and2', true); 
+                toggle('wire_and2_out', true); 
+            }
+
+            // Stage 3
+            if (and1 || and2) { 
+                toggle('gate_or', true); 
+                toggle('wire_cout', true); 
+            }
+        }
+
+
+        // --- STEP ENGINE ---
+        
+        function generateSteps() {
+            const queue = [];
+            
+            // 1. Gather Data
+            let valA = parseInt(ui.inputA.value) || 0;
+            let valB = parseInt(ui.inputB.value) || 0;
             // Clamp
             valA = Math.min(99, Math.max(0, valA));
             valB = Math.min(99, Math.max(0, valB));
+            const op = ui.op.value;
 
-            // 2. Convert to Binary (Raw Values)
-            let bitsA = toBinArray(valA, 8);
-            let bitsB = toBinArray(valB, 8);
+            const bitsA = toBinArray(valA);
+            const bitsB_raw = toBinArray(valB);
             
-            // 3. Render Registers (Always show Raw Values)
-            renderRegister('bitsA', bitsA);
-            renderRegister('bitsB', bitsB);
-            document.getElementById('displayValA').innerText = `Dec: ${valA}`;
-            document.getElementById('displayValB').innerText = `Dec: ${valB}`;
-
-            // Reset UI states
-            document.getElementById('auxContainer').classList.add('hidden-custom');
-
-            log(`Starting ${op} Operation...`);
-            log(`Fetching A: ${bitsA.slice().reverse().join('')}`);
-            log(`Fetching B: ${bitsB.slice().reverse().join('')}`);
-            await sleep(500);
-
-            let resultBits = [];
-            let resultVal = 0;
-
-            if (op === 'ADD') {
-                // Pass raw B bits and highlight Register B
-                resultBits = await simulateRippleCarryAdder(bitsA, bitsB, 0, 'bitsA', 'bitsB');
-                resultVal = fromBinArray(resultBits);
-                
-            } else if (op === 'SUB') {
-                // 2's Complement Logic
-                // Show auxiliary panel
-                document.getElementById('auxContainer').classList.remove('hidden-custom');
-                
-                log("--- Subtraction Setup ---");
-                
-                // Step 1: 1's Complement
-                let onesComp = bitwiseNot(bitsB);
-                renderRegister('bitsOnesComp', onesComp);
-                log(`1's Complement (~B): ${onesComp.slice().reverse().join('')}`);
-                await sleep(800);
-
-                // Step 2: 2's Complement (+1)
-                let twosComp = simpleAddOne(onesComp);
-                renderRegister('bitsTwosComp', twosComp);
-                log(`2's Complement (+1): ${twosComp.slice().reverse().join('')}`);
-                await sleep(800);
-
-                log("--- Processing Adder ---");
-                // Pass 2's Comp bits to adder, highlight 2's Comp display
-                resultBits = await simulateRippleCarryAdder(bitsA, twosComp, 0, 'bitsA', 'bitsTwosComp');
-                
-                // For subtraction, simple subtraction logic for decimal display
-                resultVal = valA - valB; 
-                
-            } else if (op === 'MUL') {
-                resultBits = await simulateMultiplication(bitsA, bitsB);
-                resultVal = fromBinArray(resultBits);
-            }
-
-            // Final Output
-            renderRegister('bitsResult', resultBits);
-            document.getElementById('displayValResult').innerText = `Dec: ${resultVal}`;
-            log(`Operation Complete. Result: ${resultVal}`);
-            resetGateVisuals();
-
-            isRunning = false;
-            document.getElementById('computeBtn').disabled = false;
-        }
-
-        // --- ADDER SIMULATION ---
-        
-        // Revised signature: accepts explicit bit arrays and DOM IDs for highlighting
-        async function simulateRippleCarryAdder(arrA, arrB, initialCarry, domIdA, domIdB) {
-            let carry = initialCarry;
+            // Subtraction Pre-calc
+            let bitsB_inv = invertBits(bitsB_raw);
+            let bitsB_2c = addOne(bitsB_inv);
+            
+            // Determine which bits we are actually adding
+            let operandB = (op === 'SUB') ? bitsB_2c : bitsB_raw;
+            
+            // Result Arrays
             let sumBits = new Array(8).fill(0);
+            let carry = 0; // Ripple carry state
 
-            for (let i = 0; i < 8; i++) {
-                // 1. Highlight UI
-                document.getElementById('activeBitIndex').innerText = i;
-                renderRegister(domIdA, arrA, i);
-                renderRegister(domIdB, arrB, i); // Highlights either Register B or 2's Comp Display
+            // --- STEP: INITIALIZATION ---
+            queue.push({
+                desc: "Load Inputs",
+                tags: ['REG_A', 'REG_B'],
+                run: () => {
+                    ui.displayA.innerText = `Dec: ${valA}`;
+                    ui.displayB.innerText = `Dec: ${valB}`;
+                    renderRegister(ui.bitsA, bitsA);
+                    renderRegister(ui.bitsB, bitsB_raw);
+                    ui.displayRes.innerText = "Dec: ?";
+                    renderRegister(ui.bitsRes, [0,0,0,0,0,0,0,0]);
+                    
+                    if(op === 'SUB') ui.auxPanel.classList.remove('hidden-custom');
+                    else ui.auxPanel.classList.add('hidden-custom');
 
-                // 2. Get Bit Values
-                const a = arrA[i];
-                const b = arrB[i];
+                    ui.aiPanel.classList.remove('hidden-custom');
+                    ui.aiContent.innerHTML = 'Click "Explain this Calculation" to have the AI analyze these exact bits and operations.';
+                }
+            });
 
-                // 3. Logic Gate Calculation
-                const sum = (a ^ b) ^ carry;
-                const nextCarry = (a & b) | ((a ^ b) & carry);
+            // --- STEP: SUBTRACTION PREP (If needed) ---
+            if (op === 'SUB') {
+                queue.push({
+                    desc: "Calculate 1's Complement (~B)",
+                    tags: ['INV'],
+                    run: () => {
+                        renderRegister(document.getElementById('bitsOnesComp'), bitsB_inv);
+                        highlightPanel('panelInv');
+                    }
+                });
 
-                // 4. Visualize
-                updateGateVisuals(a, b, carry);
-                log(`Bit ${i}: ${a} + ${b} + Cin(${carry}) = Sum ${sum}, Cout ${nextCarry}`);
-
-                sumBits[i] = sum;
-                renderRegister('bitsResult', sumBits, i); // Show partial result
-
-                await sleep(DELAY_MS);
-                carry = nextCarry;
+                queue.push({
+                    desc: "Add 1 for 2's Complement",
+                    tags: ['2C'],
+                    run: () => {
+                        renderRegister(document.getElementById('bitsTwosComp'), bitsB_2c);
+                        highlightPanel('panel2C');
+                    }
+                });
             }
+
+            // --- STEPS: RIPPLE CARRY ADDER (Loop 0-7) ---
+            if (op === 'ADD' || op === 'SUB') {
+                for(let i=0; i<8; i++) {
+                    const a = bitsA[i];
+                    const b = operandB[i];
+                    
+                    // Logic
+                    const s = (a ^ b) ^ carry;
+                    const nextC = (a & b) | ((a ^ b) & carry);
+                    
+                    // Capture state for the closure
+                    const bitIdx = i;
+                    const cIn = carry;
+                    const sOut = s;
+                    
+                    queue.push({
+                        desc: `Process Bit ${i}`,
+                        tags: ['GATES', `Bit ${i}`],
+                        // Callback to re-visualize this specific step
+                        visualState: { a, b, c: cIn },
+                        run: () => {
+                            document.getElementById('activeBitIndex').innerText = i;
+                            
+                            // Highlight correct source bit for B
+                            const domA = document.getElementById(`bitsA-bit-${i}`);
+                            if(domA) domA.classList.add('active');
+
+                            if (op === 'SUB') {
+                                const dom2c = document.getElementById(`bitsTwosComp-bit-${i}`);
+                                if(dom2c) dom2c.classList.add('active');
+                            } else {
+                                const domB = document.getElementById(`bitsB-bit-${i}`);
+                                if(domB) domB.classList.add('active');
+                            }
+
+                            // Update Gates
+                            updateGateSVG(a, b, cIn);
+                            
+                            return `Bit ${bitIdx}: ${a} + ${b} + Cin(${cIn}) = ${sOut}`;
+                        }
+                    });
+
+                    // Update local arrays for next iteration calculation
+                    sumBits[i] = s;
+                    carry = nextC;
+                    
+                    // Step: Update Result Register for this bit
+                    const currentSumBits = [...sumBits]; 
+                    
+                    queue.push({
+                        desc: `Write Bit ${i} to Result`,
+                        tags: ['RESULT'],
+                        visualState: { a, b, c: cIn }, // Keep gates visible
+                        run: () => {
+                            renderRegister(ui.bitsRes, currentSumBits, i);
+                            highlightElement(`bitsResult-bit-${i}`);
+                            updateGateSVG(a, b, cIn);
+                            document.getElementById('activeBitIndex').innerText = bitIdx;
+                        }
+                    });
+                }
+            } else if (op === 'MUL') {
+                 // Simplified MUL steps
+                 let resultVal = valA * valB;
+                 sumBits = toBinArray(resultVal); 
+                 
+                 queue.push({
+                     desc: "Multiplication (Direct)",
+                     tags: ['RESULT'],
+                     run: () => {
+                         renderRegister(ui.bitsRes, sumBits);
+                         return "Shift-and-Add operations processed...";
+                     }
+                 });
+            }
+
+            // --- STEP: FINALIZE ---
+            const finalVal = (op === 'MUL') ? valA * valB : (op==='SUB' ? valA - valB : valA + valB);
             
-            // Clear highlights
-            renderRegister(domIdA, arrA, -1);
-            renderRegister(domIdB, arrB, -1);
-            
-            return sumBits;
+            queue.push({
+                desc: "Operation Complete",
+                tags: ['RESULT'],
+                run: () => {
+                    ui.displayRes.innerText = `Dec: ${finalVal}`;
+                    highlightPanel('panelResult');
+                    document.getElementById('panelResult').classList.add('result-active');
+                    return `Final Result: ${finalVal}`;
+                }
+            });
+
+            return queue;
         }
 
-        async function simulateMultiplication(bitsA, bitsB) {
-            let accumulator = new Array(16).fill(0); 
+        // --- SIMULATION CONTROLLER ---
 
-            renderRegister('bitsResult', accumulator);
-
-            for (let i = 0; i < 8; i++) {
-                renderRegister('bitsB', bitsB, i);
+        const simController = {
+            reset: () => {
+                ui.console.innerHTML = '';
+                clearHighlights();
+                renderRegister(ui.bitsRes, [0,0,0,0,0,0,0,0]);
+                document.getElementById('activeBitIndex').innerText = '-';
+            },
+            
+            executeStep: (idx) => {
+                if (idx < 0 || idx >= executionQueue.length) return;
                 
-                if (bitsB[i] === 1) {
-                    log(`Bit B[${i}] is 1: Adding shifted A`);
-                    
-                    let shiftedA = new Array(16).fill(0);
-                    for(let k=0; k<8; k++) {
-                        if(bitsA[k]) shiftedA[k+i] = 1;
-                    }
+                const step = executionQueue[idx];
+                clearHighlights();
+                
+                const detailMsg = step.run();
+                
+                // Create re-visualize callback if visual state exists
+                const clickFn = step.visualState ? () => {
+                    updateGateSVG(step.visualState.a, step.visualState.b, step.visualState.c);
+                    document.getElementById('activeBitIndex').innerText = idx/2 | 0; // rough guess
+                } : null;
 
-                    // Add to accumulator
-                    let carry = 0;
-                    for(let j=0; j<16; j++) {
-                        let bitA = shiftedA[j];
-                        let bitAcc = accumulator[j];
-                        let sum = bitA ^ bitAcc ^ carry;
-                        carry = (bitA & bitAcc) | ((bitA ^ bitAcc) & carry);
-                        accumulator[j] = sum;
-                    }
-                    
-                    renderRegister('bitsResult', accumulator);
-                    await sleep(DELAY_MS);
+                const logMsg = detailMsg || step.desc;
+                const logEl = log(logMsg, step.tags, clickFn);
+                logEl.classList.add('log-line-active');
+                logEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            },
+
+            goToStep: async (targetIdx) => {
+                simController.reset();
+                for(let i=0; i<=targetIdx; i++) {
+                    const step = executionQueue[i];
+                    step.run();
+                    const clickFn = step.visualState ? () => updateGateSVG(step.visualState.a, step.visualState.b, step.visualState.c) : null;
+                    log(step.desc, step.tags, clickFn); 
+                }
+                simController.executeStep(targetIdx); 
+            },
+
+            next: () => {
+                if (stepIndex < executionQueue.length - 1) {
+                    stepIndex++;
+                    simController.executeStep(stepIndex);
                 } else {
-                    await sleep(DELAY_MS / 2);
+                    stopAutoPlay();
+                }
+            },
+
+            prev: () => {
+                if (stepIndex > 0) {
+                    stepIndex--;
+                    simController.goToStep(stepIndex);
+                }
+            },
+
+            playPause: () => {
+                if (isPlaying) {
+                    stopAutoPlay();
+                } else {
+                    startAutoPlay();
                 }
             }
-            // Clear highlight
-            renderRegister('bitsB', bitsB, -1);
-            return accumulator;
+        };
+
+        function startAutoPlay() {
+            isPlaying = true;
+            ui.btnPlayPause.innerText = "Pause";
+            ui.btnPlayPause.classList.replace('bg-cyan-700', 'bg-amber-600');
+            ui.btnPlayPause.classList.replace('border-cyan-500', 'border-amber-500');
+            
+            timer = setInterval(() => {
+                if (stepIndex < executionQueue.length - 1) {
+                    simController.next();
+                } else {
+                    stopAutoPlay();
+                }
+            }, DELAY_FAST);
         }
+
+        function stopAutoPlay() {
+            isPlaying = false;
+            clearInterval(timer);
+            ui.btnPlayPause.innerText = "Start";
+            ui.btnPlayPause.classList.replace('bg-amber-600', 'bg-cyan-700');
+            ui.btnPlayPause.classList.replace('border-amber-500', 'border-cyan-500');
+        }
+
+        // --- GEMINI AI FUNCTIONS ---
+
+        async function aiExplainLogic() {
+            const valA = parseInt(ui.inputA.value);
+            const valB = parseInt(ui.inputB.value);
+            const op = ui.op.value;
+            const bitsA = toBinArray(valA).reverse().join('');
+            const bitsB = toBinArray(valB).reverse().join('');
+            
+            ui.aiLoader.classList.remove('hidden-custom');
+            ui.aiContent.innerHTML = "Consulting the AI Architect...";
+
+            const prompt = `
+                You are a friendly computer architecture tutor.
+                The user just simulated an 8-bit CPU operation:
+                Decimal: ${valA} ${op} ${valB}
+                Binary A: ${bitsA}
+                Binary B: ${bitsB}
+                
+                Explain exactly what happened in the ALU (Arithmetic Logic Unit). 
+                - Mention specific bit positions where carries might have occurred.
+                - If it was subtraction, briefly mention the 2's complement logic used.
+                - Keep the tone encouraging and the explanation under 150 words.
+                - Use markdown for bolding key terms.
+            `;
+
+            try {
+                const response = await callGemini(prompt);
+                ui.aiContent.innerHTML = marked.parse(response);
+            } catch (error) {
+                ui.aiContent.innerHTML = `<span class="text-red-400">Error connecting to AI. Please try again.</span>`;
+                console.error(error);
+            } finally {
+                ui.aiLoader.classList.add('hidden-custom');
+            }
+        }
+
+        async function aiGenerateChallenge() {
+            const btn = document.querySelector('button[onclick="aiGenerateChallenge()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<span>⏳</span> Generating...`;
+            btn.disabled = true;
+
+            const prompt = `
+                Generate a random 8-bit CPU challenge.
+                Return ONLY a JSON object with this format (no code fences):
+                {
+                    "a": number (0-99),
+                    "b": number (0-99),
+                    "op": "ADD" or "SUB",
+                    "reason": "Short string explaining why this is interesting (e.g. 'Observe the ripple carry from bit 0 to 4' or 'Watch the 2's complement conversion')"
+                }
+                Make sure the numbers create an interesting binary scenario (like a long carry chain, overflow, or zero result).
+            `;
+
+            try {
+                const responseText = await callGemini(prompt);
+                const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+                const challenge = JSON.parse(jsonStr);
+
+                ui.inputA.value = challenge.a;
+                ui.inputB.value = challenge.b;
+                ui.op.value = challenge.op;
+
+                log(`✨ AI Challenge: ${challenge.reason}`);
+                startSimulation();
+                
+                ui.aiPanel.classList.remove('hidden-custom');
+                ui.aiContent.innerHTML = `<strong>Challenge Loaded:</strong> ${challenge.reason}<br><br>Click 'Explain' to see the detailed logic.`;
+
+            } catch (error) {
+                log("Error generating challenge.");
+                console.error(error);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function callGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        // --- MAIN ENTRY POINT ---
+
+        function startSimulation() {
+            executionQueue = generateSteps();
+            stepIndex = -1;
+            simController.reset();
+
+            if (currentMode === 'NORMAL') {
+                let i = 0;
+                function runLoop() {
+                    if (i < executionQueue.length) {
+                        stepIndex = i;
+                        simController.executeStep(i);
+                        i++;
+                        setTimeout(runLoop, DELAY_AUTO / 2); 
+                    }
+                }
+                runLoop();
+            } else {
+                log("Simulation Plan Generated. Press Start or Next.");
+                simController.next(); 
+            }
+        }
+
+        function resetUI() {
+            simController.reset();
+            renderRegister(ui.bitsA, [0,0,0,0,0,0,0,0]);
+            renderRegister(ui.bitsB, [0,0,0,0,0,0,0,0]);
+            renderRegister(ui.bitsRes, [0,0,0,0,0,0,0,0]);
+            ui.auxPanel.classList.add('hidden-custom');
+        }
+
+        renderRegister(ui.bitsA, toBinArray(12));
+        renderRegister(ui.bitsB, toBinArray(5));
 
     </script>
 </body>
